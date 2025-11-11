@@ -35,8 +35,8 @@ export default {
 	switch (interactionObject.type) {
 		case 1:
 			console.log("interaction identified as ping!")
-			return createResponse({type:1})
-			
+			console.log("responding with pong!")
+			return createResponse({type:1}) // simple 'pong' response
 			break;
 		case 2:
 			console.log("interaction identified as command interaction!")
@@ -52,7 +52,7 @@ export default {
 			break;
 	}
 		console.log("acknowledging interaction request...")
-		return createResponse(null, 401);
+		return createResponse(null, 202);
 	},
 };
 
