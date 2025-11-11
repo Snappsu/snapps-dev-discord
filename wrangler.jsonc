@@ -9,7 +9,13 @@
 	"compatibility_date": "2025-11-09",
 	"observability": {
 		"enabled": true
-	}
+	},
+	"services": [
+		{ 
+			"binding": "shibboleth", "service": "shibboleth", "remote": true
+		},{ "binding": "snapps_dev", "service": "snapps-dev-worker", "remote": true}
+]
+
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
