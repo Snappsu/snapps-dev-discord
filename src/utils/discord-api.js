@@ -6,7 +6,6 @@
 import { env } from "cloudflare:workers";
 import * as Requests from "./requests"
 
-
 // ----------------
 // Helper functions
 // ----------------
