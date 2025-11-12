@@ -4,7 +4,7 @@
 // (yeah let's use lazy)
 
 import { env } from "cloudflare:workers";
-import * as Requests from "./requests"
+import * as Requests from "../utils/requests"
 
 // ----------------
 // Helper functions

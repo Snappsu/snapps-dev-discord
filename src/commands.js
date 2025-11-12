@@ -1,5 +1,7 @@
-import * as Discord from "./discord.js";
-import * as Space from "./space.js"
+import * as Discord from "./apis/discord.js";
+import * as Space from "./apis/snapps-space.js"
+import { env } from "cloudflare:workers";
+
 
 // Command specifications go here
 
@@ -101,7 +103,7 @@ export class pet {
 	}
 
 	static async exec(interactionContent) {
-
+		try{
 		var petData;
 		const petChance = Math.random()
 		console.log(petChance)
@@ -111,9 +113,7 @@ export class pet {
 			petData = pet.chooseRandom(pet.NORMAL_PET_LIST)
 		}
 
-		var callback = await Discord.InteractionCallback(interactionContent.id, interactionContent.token, {
-			"type": Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-			"data": {
+		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, {
 				"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
 				"content": "",
 				"tts": false,
@@ -126,11 +126,12 @@ export class pet {
 					},
 					"color": petData[1]
 				}],
-			}
-		})
+			})
 
-		// Add to a global blep counter
-		return new Response()
+		} catch (e){
+			console.error(e)
+		}
+		return null
 	}
 
 }

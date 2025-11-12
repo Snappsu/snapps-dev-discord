@@ -7,8 +7,10 @@
  *
  * Learn more at https://developers.cloudflare.com/workers/
  */
-import * as Discord from "./utils/discord-api"
+import * as Discord from "./apis/discord"
 import * as Requests from "./utils/requests"
+import * as Setup from "./tools/setup"
+import * as Commands from "./commands"
 import {
 	env
 } from "cloudflare:workers";
@@ -32,13 +34,15 @@ export default {
 		var isRequestValid = await Discord.isValidRequest(interactionObject, request.headers)
 		if (!isRequestValid) {
 			console.log("telling sender that request is invalid...")
-			return new Requests.createResponse({msg:"invalid request"}, 401);
+			return new Requests.createResponse({
+				msg: "invalid request"
+			}, 401);
 		}
 
 		// jsonify the body
 		interactionObject = JSON.parse(interactionObject)
 
-		console.log ("handling request...")
+		console.log("handling request...")
 
 		//handle interaction
 		switch (interactionObject.type) {
@@ -52,24 +56,35 @@ export default {
 			case 2:
 				console.log("interaction identified as command interaction!")
 
+				// get requested command
+				const commandName = interactionObject.data.name
+				console.log(`command name: ${commandName}!`)
+				console.log(`checking if command spec exists...`)
+				var commandRawName = Setup.getCommandClassByName(commandName)
+				if (!commandRawName) { // if command spec not found
+					console.warn(`command not found!`)
+					return Requests.createResponse({
+						"type": Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+						"data": {
+							"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+							"content": "Sorry, I'm not sure how to process that command",
+							"tts": false
+						}
+					}, 404);
 
-				// test follow up stuff
+				}
+
+				// run command (in background)
+				console.log(commandRawName)
+				console.log(`calling command...`)
+
+
+				// get command details
 				ctx.waitUntil(
 					new Promise(async function (resolve) {
-
-
-
-						await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionObject.token}/messages/@original`, {
-
-							"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
-							"content": "woah",
-							"tts": false
-
-						})
-
+						await Commands[commandRawName].exec(interactionObject, ctx)
 						return resolve(undefined);
 					})
-
 				)
 
 				// assume deferred reply
@@ -98,28 +113,30 @@ export default {
 	},
 };
 
-async function isValidRequest(body,headers) {
-    console.log("checking validity of request...")
-    var isVerified = false;
-    var body = JSON.stringify(body)
-    const timestamp = headers.get('x-signature-timestamp')
-    const signature = headers.get('x-signature-ed25519')
-    try {
-        const key = await crypto.subtle.importKey("raw", Uint8Array.fromHex(env.DISCORD_BOT_PUB_KEY), { "name": "Ed25519" }, false, ["verify"])
-          let message = timestamp + body;
-        let enc = new TextEncoder();
-        var newBody  = enc.encode(message)
-        isVerified = await crypto.subtle.verify( 
-            { "name": "Ed25519" } , 
-            key, 
-            Uint8Array.fromHex(signature),
-            newBody
-        )
-    }
-    catch (error){
-        console.error(error)
-        isVerified = false
-    }
-    isVerified?console.log("request is valid!"):console.error("request is NOT valid!")
-    return isVerified
+async function isValidRequest(body, headers) {
+	console.log("checking validity of request...")
+	var isVerified = false;
+	var body = JSON.stringify(body)
+	const timestamp = headers.get('x-signature-timestamp')
+	const signature = headers.get('x-signature-ed25519')
+	try {
+		const key = await crypto.subtle.importKey("raw", Uint8Array.fromHex(env.DISCORD_BOT_PUB_KEY), {
+			"name": "Ed25519"
+		}, false, ["verify"])
+		let message = timestamp + body;
+		let enc = new TextEncoder();
+		var newBody = enc.encode(message)
+		isVerified = await crypto.subtle.verify({
+				"name": "Ed25519"
+			},
+			key,
+			Uint8Array.fromHex(signature),
+			newBody
+		)
+	} catch (error) {
+		console.error(error)
+		isVerified = false
+	}
+	isVerified ? console.log("request is valid!") : console.error("request is NOT valid!")
+	return isVerified
 }

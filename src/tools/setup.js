@@ -1,11 +1,11 @@
-import * as Discord from "./discord-api.js";
+import * as Discord from "../apis/discord.js";
 import * as Commands from "../commands.js"
 
 // To be ran whenever a new command is created
 
 //commandIDs - int[] - IDs of commands to delete
 export function getCommandClassByName(commandName){
-	var className;
+	var className = null;
 	Object.entries(Commands).forEach(command => {
 		if (command[1].spec.name==commandName) {
 			className = command[0];
