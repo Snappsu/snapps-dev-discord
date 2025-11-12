@@ -40,6 +40,12 @@ export async function sendToEndpoint(method, endpoint, body) {
 	return await Requests.createHttpRequest(method,`${env.DISCORD_API_BASE_URL+endpoint}`,body,[["Authorization",env.DISCORD_BOT_TOKEN]])
 }
 
+export function getUserAvatarURL(userData) {
+	var extension = "png" // default extention
+	if (userData.icon.substring(0, 2) == "a_") extension = "gif"
+	return `https://cdn.discordapp.com/avatars/${userData.discord_id}/${userData.icon}.${extension}`
+}
+
 // ----------------
 // Message Utilities
 //-----------------

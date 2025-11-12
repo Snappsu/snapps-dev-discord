@@ -10,11 +10,12 @@ import {
 - kinky permissions command
 - help command
 - requests commands
-
+- profile command
 */
 
 // command specifications go here
 
+// registration command
 export class register {
 
 	static registerURL = "https://discord.com/oauth2/authorize?client_id=1415423498641211542&response_type=code&redirect_uri=https%3A%2F%2Fshibboleth.snapps.dev%2Fregister%2Fdiscord%2F&scope=identify+guilds.members.read"
@@ -108,6 +109,7 @@ export class pet {
 
 	static spec = {
 		"name": "pet",
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
 		"type": Discord.ApplicationCommandTypes.CHAT_INPUT,
 		"description": "Pet the service kobold.",
 	}
@@ -145,93 +147,82 @@ export class pet {
 
 }
 
+
+// YOU ARE WORKING ON THIS
+// GODSPEED
 export class profile_user {
 	static spec = {
 		"name": "Snapps' Space Profile",
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
 		"type": Discord.ApplicationCommandTypes.USER,
 	}
 
-	static async exec(interactionContent, ctx) {
+static async exec(interactionContent, ctx) {
 
-		ctx.waitUntil(Discord.InteractionCallback(interactionContent.id, interactionContent.token, {
-			"type": Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-			"data": {
-				"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2]),
-				"content": "Loading...",
-				"tts": false
-			}
-		}));
-
-		ctx.waitUntil(await profile_user.followup(interactionContent));
-
-		var options = {
-			status: 200
-		};
-		return new Response("", options);
+		await profile_user.followup(interactionContent)
+		return
 	}
+
+
 	static async followup(interactionContent) {
 
-		console.log(interactionContent);
+		//console.log(interactionContent);
 
 		var userData;
-		var sameUser = interactionContent.member.user.id == interactionContent.data.target_id
+		var isSelf = interactionContent.member.user.id == interactionContent.data.target_id
 
 
 		console.log("Following up on profile query...")
 
-		if (sameUser) userData = await Space.getOwnProfile(interactionContent.data.target_id);
+		// get user
 
-		else userData = await Space.getUser(interactionContent.data.target_id);
+		var userDataRequest = await env.snapps_dev.getUserByDiscordID(interactionContent.data.target_id);
+		var userData = userDataRequest.data
+
+
+		// if profile private and !isSelf return private profile notice
+		if (!userData || (await env.snapps_dev.isPrivate(userData) && !isSelf)) {
+			var body = profile_user.generateNotFoundPage()
+			return await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
+		}
 
 
 		var body = profile_user.generateFrontPage(userData)
 
 		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 
-		var followup = await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
+		return await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
 
 	}
 
 	static async update(interactionContent, ctx) {
-		var body
-		switch (interactionContent.data.values[0]) {
 
+		var body
+
+		// get user
+		var userData;
+		var userDataRequest = await env.snapps_dev.getUserByDiscordID(interactionContent.message.interaction_metadata.target_user.id);
+		userData = userDataRequest.data
+
+		switch (interactionContent.data.values[0]) {
 			case "id": //Front Page
-				var userData;
-				var sameUser = interactionContent.member.user.id == interactionContent.message.interaction_metadata.target_user.id
-				if (sameUser) userData = await Space.getOwnProfile(interactionContent.message.interaction_metadata.target_user.id);
-				else userData = await Space.getUser(interactionContent.message.interaction_metadata.target_user.id);
 				body = profile_user.generateFrontPage(userData)
 				body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 				break;
 			case "ask": //Ask Page
-				body = profile_user.generateAskPage(interactionContent.message.interaction_metadata.target_user)
+				body = profile_user.generateAskPage(userData)
 				body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 				break;
 			default:
 				break;
 		}
 
-
-
 		// Send Callback
-		ctx.waitUntil(Discord.InteractionCallback(interactionContent.id, interactionContent.token, {
-			"type": Discord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
-			"data": {
-				"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2]),
-				"content": "Loading...",
-				"tts": false
-			}
-		}));
 
-		var followup = await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
-		console.log(JSON.stringify(body))
+
+		await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
+		//console.log(JSON.stringify(body))
 		//console.log(followup)
-
-		var options = {
-			status: 202
-		};
-		return new Response(options);
 	}
 
 	static generatePageMenuComponent() {
@@ -264,64 +255,41 @@ export class profile_user {
 			components: []
 		}
 
-		if (userData.data.status == 404) {
-
-			body = {
-				"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
-				"content": "",
-				"tts": false,
-				"embeds": [{
-					"id": 130249665,
-					"description": "I can't seem to find any information about this user...",
-					"fields": [],
-					"color": 16731688,
-					"title": "User Not Found"
-				}],
-				"components": [],
-				"actions": {}
-			};
-		} else {
 
 
-			var basicsContainer = new Discord.ComponentBuilder(Discord.ComponentTypes.CONTAINER)
-			basicsContainer.setParams({
-				accent_color: 0x00ffff
-			})
+		var basicsContainer = new Discord.ComponentBuilder(Discord.ComponentTypes.CONTAINER)
+		basicsContainer.setParams({
+			accent_color: 0x00ffff
+		})
 
-			//Profile Basics
-			var basicsSection = new Discord.ComponentBuilder(Discord.ComponentTypes.SECTION)
-			var userIcon = new Discord.ComponentBuilder(Discord.ComponentTypes.THUMBNAIL)
-			userIcon.setParams({
-				media: `https://cdn.discordapp.com/avatars/${userData.data.data.discord_id}/${userData.data.data.icon}?size=128`
-			})
-			basicsSection.setAccessory(userIcon)
-			var userInfoText = new Discord.ComponentBuilder(Discord.ComponentTypes.TEXT_DISPLAY)
-			userInfoText.setContent(`
-			# [${userData.data.data.nickname}](https://space.snapps.dev/profile?value=${userData.data.data.uuid})
-Title: ${userData.data.data.title ? userData.data.data.title : "None"}
-Registered Since: ${new Date(userData.data.data.created_at * 1000).toLocaleDateString()}
+		//Profile Basics
+		var basicsSection = new Discord.ComponentBuilder(Discord.ComponentTypes.SECTION)
+		var userIcon = new Discord.ComponentBuilder(Discord.ComponentTypes.THUMBNAIL)
+		userIcon.setParams({
+			media: Discord.getUserAvatarURL(userData)
+		})
+		basicsSection.setAccessory(userIcon)
+		var userInfoText = new Discord.ComponentBuilder(Discord.ComponentTypes.TEXT_DISPLAY)
+		userInfoText.setContent(`
+			# [${userData.nickname?userData.nickname:userData.discord_username}](https://space.snapps.dev/profile?value=${userData.uuid})
+Title: ${userData.title ? userData.title : "None"}
+Registered Since: ${new Date(userData.created_at).toLocaleDateString()}
 			`)
 
-			basicsSection.addComponent(userInfoText)
+		basicsSection.addComponent(userInfoText)
 
-			basicsContainer.addComponent(basicsSection)
+		basicsContainer.addComponent(basicsSection)
 
-			body.components.push(basicsContainer.build())
+		body.components.push(basicsContainer.build())
 
-			const menubar = profile_user.generatePageMenuComponent()
-			body.components.push(menubar)
-
-
-		}
-
-
-
+		const menubar = profile_user.generatePageMenuComponent()
+		body.components.push(menubar)
 		return body
 
 	}
 
 	//WIP: Wait till asks are a thing
-	static generateAskPage(discordUserData) {
+	static generateAskPage(userData) {
 
 		var body = {
 			components: []
@@ -336,7 +304,7 @@ Registered Since: ${new Date(userData.data.data.created_at * 1000).toLocaleDateS
 		var basicsSection = new Discord.ComponentBuilder(Discord.ComponentTypes.SECTION)
 		var userIcon = new Discord.ComponentBuilder(Discord.ComponentTypes.THUMBNAIL)
 		userIcon.setParams({
-			media: `https://cdn.discordapp.com/avatars/${discordUserData.id}/${discordUserData.avatar}?size=128`
+			media: Discord.getUserAvatarURL(userData)
 		})
 		basicsSection.setAccessory(userIcon)
 		var userInfoText = new Discord.ComponentBuilder(Discord.ComponentTypes.TEXT_DISPLAY)
@@ -353,5 +321,26 @@ Woah, hey, hold up! This is a work in progress!`)
 		body.components.push(menubar)
 
 		return body
+
+	}
+
+	static generateNotFoundPage() {
+		var body = {
+			"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+			"content": "",
+			"tts": false,
+			"embeds": [{
+				"id": 130249665,
+				"description": "I can't seem to find any information about this user...",
+				"fields": [],
+				"color": 16731688,
+				"title": "User Not Found"
+			}],
+			"components": [],
+			"actions": {}
+		};
+
+		return body
+
 	}
 }
