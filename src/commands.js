@@ -1,6 +1,9 @@
 import * as Discord from "./apis/discord.js";
 import * as Space from "./apis/snapps-space.js"
-import { env } from "cloudflare:workers";
+import * as Requests from "./utils/requests.js"
+import {
+	env
+} from "cloudflare:workers";
 
 
 // Command specifications go here
@@ -11,21 +14,21 @@ export class register {
 
 	static spec = {
 		name: "register",
+		callback: Discord.InteractionCallbackTypes.MODAL,
 		type: Discord.ApplicationCommandTypes.CHAT_INPUT,
 		description: "Sends you a link to sign up to Snapps Space.",
 		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM]
 	}
-	static async exec(interactionContent) {
-		console.log("Sending registration info")
+	static exec(interactionContent) {
+		console.log("sending registration modal...")
 
-		await Discord.InteractionCallback(interactionContent.id, interactionContent.token, {
-
-			"type": Discord.InteractionCallbackTypes.MODAL,
+		return Requests.createResponse({
+			"type": register.spec.callback,
 			"data": {
 				"custom_id": "register_modal",
 				"title": "Snapps' Space Registration",
 				"components": [{
-						"type": 10, // ComponentType.TEXT_DISPLAY
+						"type": Discord.ComponentTypes.TEXT_DISPLAY, // ComponentType.TEXT_DISPLAY
 						"content": `## What's this all about?
 You are currently about to make an account on my site, [snapps.dev](https://snapps.dev). Everything is linked to your discord account so there's no need to create a password.
 
@@ -65,7 +68,7 @@ With this account, you'll be access to many things:
 					}
 				]
 			}
-		})
+		}, 200);
 	}
 }
 
@@ -103,17 +106,17 @@ export class pet {
 	}
 
 	static async exec(interactionContent) {
-		try{
-		var petData;
-		const petChance = Math.random()
-		console.log(petChance)
-		if (petChance <= pet.SPECIAL_CHANCE) { // If special pet
-			petData = pet.chooseRandom(pet.SPECIAL_PET_LIST)
-		} else {
-			petData = pet.chooseRandom(pet.NORMAL_PET_LIST)
-		}
+		try {
+			var petData;
+			const petChance = Math.random()
+			console.log(petChance)
+			if (petChance <= pet.SPECIAL_CHANCE) { // If special pet
+				petData = pet.chooseRandom(pet.SPECIAL_PET_LIST)
+			} else {
+				petData = pet.chooseRandom(pet.NORMAL_PET_LIST)
+			}
 
-		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, {
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, {
 				"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
 				"content": "",
 				"tts": false,
@@ -128,10 +131,9 @@ export class pet {
 				}],
 			})
 
-		} catch (e){
+		} catch (e) {
 			console.error(e)
 		}
-		return null
 	}
 
 }
@@ -175,18 +177,18 @@ export class profile_user {
 		else userData = await Space.getUser(interactionContent.data.target_id);
 
 
-			var body = profile_user.generateFrontPage(userData)
+		var body = profile_user.generateFrontPage(userData)
 
-			body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
+		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 
-			var followup = await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
+		var followup = await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
 
 	}
 
-	static async update(interactionContent,ctx){
+	static async update(interactionContent, ctx) {
 		var body
 		switch (interactionContent.data.values[0]) {
-			
+
 			case "id": //Front Page
 				var userData;
 				var sameUser = interactionContent.member.user.id == interactionContent.message.interaction_metadata.target_user.id
@@ -202,9 +204,9 @@ export class profile_user {
 			default:
 				break;
 		}
-		
-		 
-		
+
+
+
 		// Send Callback
 		ctx.waitUntil(Discord.InteractionCallback(interactionContent.id, interactionContent.token, {
 			"type": Discord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
@@ -222,7 +224,7 @@ export class profile_user {
 		var options = {
 			status: 202
 		};
-		return new Response( options);
+		return new Response(options);
 	}
 
 	static generatePageMenuComponent() {
@@ -274,34 +276,38 @@ export class profile_user {
 		} else {
 
 
-var basicsContainer = new Discord.ComponentBuilder(Discord.ComponentTypes.CONTAINER)
-		basicsContainer.setParams({accent_color:0x00ffff})
+			var basicsContainer = new Discord.ComponentBuilder(Discord.ComponentTypes.CONTAINER)
+			basicsContainer.setParams({
+				accent_color: 0x00ffff
+			})
 
-		//Profile Basics
-		var basicsSection = new Discord.ComponentBuilder(Discord.ComponentTypes.SECTION)
-		var userIcon = new Discord.ComponentBuilder(Discord.ComponentTypes.THUMBNAIL)
-		userIcon.setParams({media:`https://cdn.discordapp.com/avatars/${userData.data.data.discord_id}/${userData.data.data.icon}?size=128`})
-		basicsSection.setAccessory(userIcon)
-		var userInfoText = new Discord.ComponentBuilder(Discord.ComponentTypes.TEXT_DISPLAY)
-		userInfoText.setContent(`
+			//Profile Basics
+			var basicsSection = new Discord.ComponentBuilder(Discord.ComponentTypes.SECTION)
+			var userIcon = new Discord.ComponentBuilder(Discord.ComponentTypes.THUMBNAIL)
+			userIcon.setParams({
+				media: `https://cdn.discordapp.com/avatars/${userData.data.data.discord_id}/${userData.data.data.icon}?size=128`
+			})
+			basicsSection.setAccessory(userIcon)
+			var userInfoText = new Discord.ComponentBuilder(Discord.ComponentTypes.TEXT_DISPLAY)
+			userInfoText.setContent(`
 			# [${userData.data.data.nickname}](https://space.snapps.dev/profile?value=${userData.data.data.uuid})
 Title: ${userData.data.data.title ? userData.data.data.title : "None"}
 Registered Since: ${new Date(userData.data.data.created_at * 1000).toLocaleDateString()}
 			`)
 
-		basicsSection.addComponent(userInfoText)
-		
-		basicsContainer.addComponent(basicsSection)
-		
-		body.components.push(basicsContainer.build())
+			basicsSection.addComponent(userInfoText)
 
-		const menubar = profile_user.generatePageMenuComponent()
-		body.components.push(menubar)
+			basicsContainer.addComponent(basicsSection)
+
+			body.components.push(basicsContainer.build())
+
+			const menubar = profile_user.generatePageMenuComponent()
+			body.components.push(menubar)
 
 
 		}
 
-		
+
 
 		return body
 
@@ -315,21 +321,25 @@ Registered Since: ${new Date(userData.data.data.created_at * 1000).toLocaleDateS
 		}
 
 		var basicsContainer = new Discord.ComponentBuilder(Discord.ComponentTypes.CONTAINER)
-		basicsContainer.setParams({accent_color:0xff00ff})
+		basicsContainer.setParams({
+			accent_color: 0xff00ff
+		})
 
 		//Profile Basics
 		var basicsSection = new Discord.ComponentBuilder(Discord.ComponentTypes.SECTION)
 		var userIcon = new Discord.ComponentBuilder(Discord.ComponentTypes.THUMBNAIL)
-		userIcon.setParams({media:`https://cdn.discordapp.com/avatars/${discordUserData.id}/${discordUserData.avatar}?size=128`})
+		userIcon.setParams({
+			media: `https://cdn.discordapp.com/avatars/${discordUserData.id}/${discordUserData.avatar}?size=128`
+		})
 		basicsSection.setAccessory(userIcon)
 		var userInfoText = new Discord.ComponentBuilder(Discord.ComponentTypes.TEXT_DISPLAY)
 		userInfoText.setContent(`# Ask Stats
 Woah, hey, hold up! This is a work in progress!`)
 
 		basicsSection.addComponent(userInfoText)
-		
+
 		basicsContainer.addComponent(basicsSection)
-		
+
 		body.components.push(basicsContainer.build())
 
 		const menubar = profile_user.generatePageMenuComponent()

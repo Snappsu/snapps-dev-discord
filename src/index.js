@@ -73,28 +73,35 @@ export default {
 					}, 404);
 
 				}
+					console.log(Commands[commandRawName].spec.callback)
 
-				// run command (in background)
-				console.log(commandRawName)
-				console.log(`calling command...`)
+				// get callback type because it may need to be instant
+				switch (Commands[commandRawName].spec.callback) {
+					case Discord.InteractionCallbackTypes.MODAL:
+						return Commands[commandRawName].exec(interactionObject, ctx)
+						break;
+
+					default:
+						// run command (in background)
+						console.log(`calling command...`)
+						ctx.waitUntil(
+							new Promise(async function (resolve) {
+								await Commands[commandRawName].exec(interactionObject, ctx)
+								return resolve(undefined);
+							})
+						)
+						// assume deferred reply
+						return Requests.createResponse({
+							"type": Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+							"data": {
+								"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+								"tts": false
+							}
+						}, 200);
+						break;
+				}
 
 
-				// get command details
-				ctx.waitUntil(
-					new Promise(async function (resolve) {
-						await Commands[commandRawName].exec(interactionObject, ctx)
-						return resolve(undefined);
-					})
-				)
-
-				// assume deferred reply
-				return Requests.createResponse({
-					"type": Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-					"data": {
-						"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
-						"tts": false
-					}
-				}, 200);
 
 
 				break;
