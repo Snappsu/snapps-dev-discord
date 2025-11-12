@@ -58,7 +58,7 @@ export default {
 				console.log("interaction identified as command interaction!")
 
 				// get requested command
-				const commandName = interactionObject.data.name
+				var commandName = interactionObject.data.name
 				console.log(`command name: ${commandName}!`)
 				console.log(`checking if command spec exists...`)
 				var commandRawName = Setup.getCommandClassByName(commandName)
@@ -104,6 +104,41 @@ export default {
 				break;
 			case 3:
 				console.log("interaction identified as message component interaction!")
+
+				// get requested command
+				var commandName = interactionObject.message.interaction.name
+				console.log(`command name: ${commandName}!`)
+				console.log(`checking if command spec exists...`)
+				var commandRawName = Setup.getCommandClassByName(commandName)
+				if (!commandRawName) { // if command spec not found
+					console.warn(`command not found!`)
+					return Requests.createResponse({
+						"type": Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
+						"data": {
+							"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+							"content": "Sorry, I'm not sure how to process that command",
+							"tts": false
+						}
+					}, 404);
+
+				}
+
+				// run command (in background)
+				console.log(`calling command...`)
+				ctx.waitUntil(
+					new Promise(async function (resolve) {
+						await Commands[commandRawName].update(interactionObject)
+						return resolve(undefined);
+					})
+				)
+				// assume deferred reply
+				return Requests.createResponse({
+					"type": Discord.InteractionCallbackTypes.DEFERRED_UPDATE_MESSAGE,
+					"data": {
+						"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+						"tts": false
+					}
+				}, 200);
 				break;
 			case 4:
 				console.log("interaction identified as command autocomplete interaction!")

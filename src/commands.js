@@ -157,51 +157,45 @@ export class profile_user {
 		"type": Discord.ApplicationCommandTypes.USER,
 	}
 
-static async exec(interactionContent, ctx) {
+	static async exec(interactionContent) {
 
 		await profile_user.followup(interactionContent)
-		return
+	
 	}
 
 
 	static async followup(interactionContent) {
 
-		//console.log(interactionContent);
-
-		var userData;
 		var isSelf = interactionContent.member.user.id == interactionContent.data.target_id
-
+		var body;
 
 		console.log("Following up on profile query...")
 
 		// get user
-
-		var userDataRequest = await env.snapps_dev.getUserByDiscordID(interactionContent.data.target_id);
+		var userData;
+		var userDataRequest = await Space.getUser(interactionContent.data.target_id);
 		var userData = userDataRequest.data
 
 
 		// if profile private and !isSelf return private profile notice
 		if (!userData || (await env.snapps_dev.isPrivate(userData) && !isSelf)) {
-			var body = profile_user.generateNotFoundPage()
-			return await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
+			body = profile_user.generateNotFoundPage()
+		} else {
+			body = profile_user.generateFrontPage(userData)
 		}
-
-
-		var body = profile_user.generateFrontPage(userData)
-
 		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 
-		return await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
+		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, body)
 
 	}
 
-	static async update(interactionContent, ctx) {
+	static async update(interactionContent) {
 
 		var body
 
 		// get user
 		var userData;
-		var userDataRequest = await env.snapps_dev.getUserByDiscordID(interactionContent.message.interaction_metadata.target_user.id);
+		var userDataRequest = await Space.getUser(interactionContent.message.interaction_metadata.target_user.id);
 		userData = userDataRequest.data
 
 		switch (interactionContent.data.values[0]) {
@@ -213,16 +207,10 @@ static async exec(interactionContent, ctx) {
 				body = profile_user.generateAskPage(userData)
 				body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 				break;
-			default:
-				break;
 		}
 
 		// Send Callback
-
-
-		await Discord.FollowupMessage("edit", interactionContent.application_id, interactionContent.token, body);
-		//console.log(JSON.stringify(body))
-		//console.log(followup)
+		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, body)
 	}
 
 	static generatePageMenuComponent() {
@@ -254,9 +242,6 @@ static async exec(interactionContent, ctx) {
 		var body = {
 			components: []
 		}
-
-
-
 		var basicsContainer = new Discord.ComponentBuilder(Discord.ComponentTypes.CONTAINER)
 		basicsContainer.setParams({
 			accent_color: 0x00ffff
