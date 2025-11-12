@@ -35,7 +35,7 @@ export default {
 		// validate request
 		if (!await Discord.isValidRequest(interactionObject, request.headers)) {
 			console.log("telling sender that request is invalid...")
-			return new createResponse(null, 401);
+			return new Requests.createResponse(null, 401);
 		}
 
 		//handle interaction
@@ -50,7 +50,7 @@ export default {
 			case 2:
 				console.log("interaction identified as command interaction!")
 
-				
+
 				// test follow up stuff
 				ctx.waitUntil(
 					new Promise(async function (resolve) {
