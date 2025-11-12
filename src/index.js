@@ -18,25 +18,27 @@ export default {
 
 		// extract body
 		var interactionObject
-		if (request.headers.get('content-type') == 'application/json') interactionObject = await request.json()
-		else interactionObject = await request.text()
+		interactionObject = await request.text()
 
 		// log request
 		console.log("incoming request!")
 		console.log("===== request data =====")
 		console.log(JSON.stringify(request, null, 2))
 		console.log("===== request body =====")
-		console.log(JSON.stringify(interactionObject, null, 2))
+		console.log(JSON.stringify(JSON.parse(interactionObject), null, 2)) // cursed, ik, shutup
 		console.log("===== end of request info =====")
 
 		// validate request
-		var isRequestValid = await isValidRequest(interactionObject, request.headers)
+		var isRequestValid = await Discord.isValidRequest(interactionObject, request.headers)
 		if (!isRequestValid) {
 			console.log("telling sender that request is invalid...")
-			return new Requests.createResponse({
-				msg: "invalid request"
-			}, 401);
+			return new Requests.createResponse({msg:"invalid request"}, 401);
 		}
+
+		// jsonify the body
+		interactionObject = JSON.parse(interactionObject)
+
+		console.log ("handling request...")
 
 		//handle interaction
 		switch (interactionObject.type) {
@@ -96,30 +98,28 @@ export default {
 	},
 };
 
-async function isValidRequest(body, headers) {
-	console.log("checking validity of request...")
-	var isVerified = false;
-	var body = JSON.stringify(body)
-	const timestamp = headers.get('x-signature-timestamp')
-	const signature = headers.get('x-signature-ed25519')
-	try {
-		const key = await crypto.subtle.importKey("raw", Uint8Array.fromHex(env.DISCORD_BOT_PUB_KEY), {
-			"name": "Ed25519"
-		}, false, ["verify"])
-		let message = timestamp + body;
-		let enc = new TextEncoder();
-		var newBody = enc.encode(message)
-		isVerified = await crypto.subtle.verify({
-				"name": "Ed25519"
-			},
-			key,
-			Uint8Array.fromHex(signature),
-			newBody
-		)
-	} catch (error) {
-		console.error(error)
-		isVerified = false
-	}
-	isVerified ? console.log("request is valid!") : console.error("request is NOT valid!")
-	return isVerified
+async function isValidRequest(body,headers) {
+    console.log("checking validity of request...")
+    var isVerified = false;
+    var body = JSON.stringify(body)
+    const timestamp = headers.get('x-signature-timestamp')
+    const signature = headers.get('x-signature-ed25519')
+    try {
+        const key = await crypto.subtle.importKey("raw", Uint8Array.fromHex(env.DISCORD_BOT_PUB_KEY), { "name": "Ed25519" }, false, ["verify"])
+          let message = timestamp + body;
+        let enc = new TextEncoder();
+        var newBody  = enc.encode(message)
+        isVerified = await crypto.subtle.verify( 
+            { "name": "Ed25519" } , 
+            key, 
+            Uint8Array.fromHex(signature),
+            newBody
+        )
+    }
+    catch (error){
+        console.error(error)
+        isVerified = false
+    }
+    isVerified?console.log("request is valid!"):console.error("request is NOT valid!")
+    return isVerified
 }
