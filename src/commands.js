@@ -5,8 +5,15 @@ import {
 	env
 } from "cloudflare:workers";
 
+/*
+===== TODO LIST =====
+- kinky permissions command
+- help command
+- requests commands
 
-// Command specifications go here
+*/
+
+// command specifications go here
 
 export class register {
 
@@ -346,8 +353,5 @@ Woah, hey, hold up! This is a work in progress!`)
 		body.components.push(menubar)
 
 		return body
-
 	}
-
-
 }

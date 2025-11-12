@@ -11,6 +11,7 @@ import * as Discord from "./apis/discord"
 import * as Requests from "./utils/requests"
 import * as Setup from "./tools/setup"
 import * as Commands from "./commands"
+import * as Modals from "./utils/modals"
 import {
 	env
 } from "cloudflare:workers";
@@ -73,11 +74,11 @@ export default {
 					}, 404);
 
 				}
-					console.log(Commands[commandRawName].spec.callback)
-
 				// get callback type because it may need to be instant
+				// TODO: OTHER CALLBACK TYPES
 				switch (Commands[commandRawName].spec.callback) {
 					case Discord.InteractionCallbackTypes.MODAL:
+						console.log("sending modal response...")
 						return Commands[commandRawName].exec(interactionObject, ctx)
 						break;
 
@@ -86,7 +87,7 @@ export default {
 						console.log(`calling command...`)
 						ctx.waitUntil(
 							new Promise(async function (resolve) {
-								await Commands[commandRawName].exec(interactionObject, ctx)
+								await Commands[commandRawName].exec(interactionObject)
 								return resolve(undefined);
 							})
 						)
@@ -100,10 +101,6 @@ export default {
 						}, 200);
 						break;
 				}
-
-
-
-
 				break;
 			case 3:
 				console.log("interaction identified as message component interaction!")
@@ -113,6 +110,22 @@ export default {
 				break;
 			case 5:
 				console.log("interaction identified as modal submittion!")
+				// process modal (in background)
+				console.log(`processing modal command...`)
+				ctx.waitUntil(
+					new Promise(async function (resolve) {
+						await Modals.processModal(interactionObject)
+						return resolve(undefined);
+					})
+				)
+				// assume deferred reply
+				return Requests.createResponse({
+					"type": Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+					"data": {
+						"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+						"tts": false
+					}
+				}, 200);
 				break;
 		}
 		console.log("acknowledging interaction request...")
