@@ -30,9 +30,12 @@ export default {
 		console.log("===== end of request info =====")
 
 		// validate request
-		if (!await Discord.isValidRequest(interactionObject, request.headers)) {
+		var isRequestValid = await isValidRequest(interactionObject, request.headers)
+		if (!isRequestValid) {
 			console.log("telling sender that request is invalid...")
-			return new Requests.createResponse({msg:"invalid request"}, 401);
+			return new Requests.createResponse({
+				msg: "invalid request"
+			}, 401);
 		}
 
 		//handle interaction
@@ -92,3 +95,31 @@ export default {
 		return Requests.createResponse(null, 202);
 	},
 };
+
+async function isValidRequest(body, headers) {
+	console.log("checking validity of request...")
+	var isVerified = false;
+	var body = JSON.stringify(body)
+	const timestamp = headers.get('x-signature-timestamp')
+	const signature = headers.get('x-signature-ed25519')
+	try {
+		const key = await crypto.subtle.importKey("raw", Uint8Array.fromHex(env.DISCORD_BOT_PUB_KEY), {
+			"name": "Ed25519"
+		}, false, ["verify"])
+		let message = timestamp + body;
+		let enc = new TextEncoder();
+		var newBody = enc.encode(message)
+		isVerified = await crypto.subtle.verify({
+				"name": "Ed25519"
+			},
+			key,
+			Uint8Array.fromHex(signature),
+			newBody
+		)
+	} catch (error) {
+		console.error(error)
+		isVerified = false
+	}
+	isVerified ? console.log("request is valid!") : console.error("request is NOT valid!")
+	return isVerified
+}

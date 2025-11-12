@@ -11,31 +11,6 @@ import * as Requests from "./requests"
 // Helper functions
 // ----------------
 
-export async function isValidRequest(body,headers) {
-	console.log("checking validity of request...")
-	var isVerified = false;
-	var body = JSON.stringify(body)
-	const timestamp = headers.get('x-signature-timestamp')
-	const signature = headers.get('x-signature-ed25519')
-	try {
-		const key = await crypto.subtle.importKey("raw", Uint8Array.fromHex(env.DISCORD_BOT_PUB_KEY), { "name": "Ed25519" }, false, ["verify"])
-		  let message = timestamp + body;
-		let enc = new TextEncoder();
-		var newBody  = enc.encode(message)
-		isVerified = await crypto.subtle.verify( 
-			{ "name": "Ed25519" } , 
-			key, 
-			Uint8Array.fromHex(signature),
-			newBody
-		)
-	}
-	catch (error){
-		isVerified = false
-	}
-	isVerified?console.log("request is valid!"):console.error("request is NOT valid!")
-	return isVerified
-}
-
 export async function sendToEndpoint(method, endpoint, body) {
 	console.log("making request to discord...")
 	return await Requests.createHttpRequest(method,`${env.DISCORD_API_BASE_URL+endpoint}`,body,[["Authorization",env.DISCORD_BOT_TOKEN]])
