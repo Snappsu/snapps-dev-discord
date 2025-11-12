@@ -2,7 +2,7 @@ export function createResponse(body, status = 200) {
 	console.log(`creating ${status} response...`)
 	const headers = new Headers()
 	var USER_AGENT = "SnappsDevBot (github.com/Snappsu/snapps-dev-discord/, 1.0)"
-	headers.append('content-type', 'application/json')
+	if (body)headers.append('content-type', 'application/json')
 	headers.append('user-agent', USER_AGENT)
 	const response = new Response(body ? JSON.stringify(body) : null, {
 		status: status,
@@ -55,7 +55,7 @@ export async function createHttpRequest(method, url, body = null, headers, ) {
 		console.log('response recieved!');
 		console.log('logging response info...');
 		console.log('===== response data =====');
-		console.log(res);
+		console.log(JSON.stringify(res, null, 2));
 		console.log('===== response body =====');
 		console.log(JSON.stringify(data, null, 2));
 		console.log('===== end of response info =====');

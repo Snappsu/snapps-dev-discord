@@ -12,9 +12,6 @@ import * as Requests from "./utils/requests"
 import {
 	env
 } from "cloudflare:workers";
-import {
-	Routes
-} from 'discord-api-types/v10';
 
 export default {
 	async fetch(request, env, ctx) {
@@ -27,15 +24,15 @@ export default {
 		// log request
 		console.log("incoming request!")
 		console.log("===== request data =====")
-		console.log(request)
+		console.log(JSON.stringify(request, null, 2))
 		console.log("===== request body =====")
-		console.log(interactionObject)
+		console.log(JSON.stringify(interactionObject, null, 2))
 		console.log("===== end of request info =====")
 
 		// validate request
 		if (!await Discord.isValidRequest(interactionObject, request.headers)) {
 			console.log("telling sender that request is invalid...")
-			return new Requests.createResponse(null, 401);
+			return new Requests.createResponse({msg:"invalid request"}, 401);
 		}
 
 		//handle interaction
@@ -56,15 +53,15 @@ export default {
 					new Promise(async function (resolve) {
 
 
-						
+
 						await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionObject.token}/messages/@original`, {
-	
-								"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
-								"content": "woah",
-								"tts": false
-							
+
+							"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+							"content": "woah",
+							"tts": false
+
 						})
-							
+
 						return resolve(undefined);
 					})
 
@@ -72,12 +69,12 @@ export default {
 
 				// assume deferred reply
 				return Requests.createResponse({
-							"type": Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-							"data": {
-								"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
-								"tts": false
-							}
-						}, 200);
+					"type": Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+					"data": {
+						"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+						"tts": false
+					}
+				}, 200);
 
 
 				break;
