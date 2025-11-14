@@ -314,7 +314,7 @@ Woah, hey, hold up! This is a work in progress!`)
 
 	static generateNotFoundPage() {
 		var body = {
-			components
+			components:[]
 		};
 		/*
 				"components": [
