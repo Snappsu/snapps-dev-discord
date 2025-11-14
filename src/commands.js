@@ -163,7 +163,7 @@ export class profile_user {
 	static async exec(interactionContent) {
 
 		await profile_user.followup(interactionContent)
-	
+
 	}
 
 
@@ -186,7 +186,7 @@ export class profile_user {
 		} else {
 			body = profile_user.generateFrontPage(userData)
 		}
-		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL])
+		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 
 		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, body)
 
@@ -314,19 +314,35 @@ Woah, hey, hold up! This is a work in progress!`)
 
 	static generateNotFoundPage() {
 		var body = {
-			"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
-			"content": "",
-			"tts": false,
-			"embeds": [{
-				"id": 130249665,
-				"description": "I can't seem to find any information about this user...",
-				"fields": [],
-				"color": 16731688,
-				"title": "User Not Found"
-			}],
-			"components": [],
-			"actions": {}
+			components
 		};
+		/*
+				"components": [
+		    {
+		      "type": 17,
+		      "accent_color": 15035189,
+		      "spoiler": false,
+		      "components": [
+		        {
+		          "type": 10,
+		          "content": "# User Not Found\nI can't seem to find any information about this user..."
+		        }
+		      ]
+		    }
+		  ],
+		  */
+		var container = new Discord.ComponentBuilder(Discord.ComponentTypes.CONTAINER)
+		container.setParams({
+			accent_color: 15035189
+		})
+
+		var text = new Discord.ComponentBuilder(Discord.ComponentTypes.TEXT_DISPLAY)
+		text.setContent("# User Not Found\nI can't seem to find any information about this user...")
+
+		container.addComponent(text)
+
+		body.components.push(container.build())
+
 
 		return body
 
