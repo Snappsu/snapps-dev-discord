@@ -11,6 +11,9 @@ import {
 - help command
 - requests commands
 - profile command
+- account settings commands
+- asks commands
+- commissions
 */
 
 // command specifications go here
