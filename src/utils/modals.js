@@ -12,16 +12,21 @@ export async function processModal(interactionObject) {
 		console.log("processing modal...")
 		switch (interactionObject.data.custom_id) {
 			case "register_modal":
-
+				console.log("user registration modal submittion identified...")
 				var body;
 				interactionObject.data.components.forEach(component => {
 					console.log(component)
 				});
 
-				var registration = await env.snapps_dev.createUserViaDiscordInternal(interactionObject.member.user)
-				var userData = await env.snapps_dev.getUserByDiscordID(interactionObject.member.user.id).data
+				console.log("attempting to register...")
+                console.log(interactionObject.member.user)
 
+				var registration = await env.snapps_dev.createUserViaDiscordInternal(interactionObject.member.user)
 				console.log(registration)
+
+				var userData = await env.snapps_dev.getUserByDiscordID(interactionObject.member.user.id).data
+				console.log(userData)
+
 
 				var userData;
 				//if already registered; hard-coded cause i've lost everything

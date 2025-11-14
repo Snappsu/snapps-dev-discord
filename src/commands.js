@@ -11,6 +11,9 @@ import {
 - help command
 - requests commands
 - profile command
+- account settings commands
+- asks commands
+- commissions
 */
 
 // command specifications go here
@@ -183,7 +186,7 @@ export class profile_user {
 		} else {
 			body = profile_user.generateFrontPage(userData)
 		}
-		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
+		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL])
 
 		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, body)
 
