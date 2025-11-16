@@ -328,11 +328,12 @@ export class account_privacy {
 			// log command or something
 
 			// do command stuff
-			var message = {} // the message to send back
-			message.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]) // make the message ephemeral
-
-			// return message to discord
-			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, message)
+			var userDataRequest = await Space.getUser(interactionData.member.user.id);
+			var userData = userDataRequest.data
+			const currentPrivacy = await Space.getUserPrivacy(userData)
+			var body = account_privacy.createPrivacyModal(currentPrivacy)
+			body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, body)
 
 		} catch (e) {
 			// log error
@@ -353,7 +354,51 @@ export class account_privacy {
 	}
 
 	// when message component is interacted with, this is the fuction that runs
-	static async update(interactionData) {}
+	static async update(interactionData) {
+		var userDataRequest = await Space.getUser(interactionData.member.user.id);
+		var userData = userDataRequest.data
+		var currentPrivacy = await Space.getUserPrivacy(userData) // get current
+		currentPrivacy ? await Space.removeUserFlag(userData, 0b100) : await Space.addUserFlag(userData, 0b100) // flip it
+		currentPrivacy ? currentPrivacy = false : currentPrivacy = true
+
+		var body = account_privacy.createPrivacyModal(currentPrivacy) // create body
+		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
+		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, body)
+	}
+
+	static createPrivacyModal(currentPrivacy) {
+		var body = {
+			components: []
+		}
+
+		// Text
+		var container = new Discord.ComponentBuilder(Discord.ComponentTypes.CONTAINER)
+		container.setParams({
+			accent_color: 0x0099ff
+		})
+		var text = new Discord.ComponentBuilder(Discord.ComponentTypes.TEXT_DISPLAY)
+		text.setContent(`Currently your profile is...\n## __**${currentPrivacy?"PRIVATE":"PUBLIC"}**__!`)
+		container.addComponent(text)
+		body.components.push(container.build())
+
+		// Buttons
+		var buttonRow = new Discord.ComponentBuilder(Discord.ComponentTypes.ACTION_ROW)
+		var toggleButton = new Discord.ComponentBuilder(Discord.ComponentTypes.BUTTON)
+		currentPrivacy ? toggleButton.setParams({
+			style: Discord.ButtonStyles.DANGER,
+			label: "MAKE PUBLIC"
+		}) : toggleButton.setParams({
+			style: Discord.ButtonStyles.SUCCESS,
+			label: "MAKE PRIVATE"
+		})
+		toggleButton.setParams({
+			custom_id: "toggle_btn"
+		})
+		buttonRow.addComponent(toggleButton)
+		body.components.push(buttonRow.build())
+
+		return body
+	}
 }
 
 // --- account wild ---
@@ -722,7 +767,7 @@ Woah, hey, hold up! This is a work in progress!`)
 
 	static generateNotFoundPage() {
 		var body = {
-			components:[]
+			components: []
 		};
 		/*
 				"components": [

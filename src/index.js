@@ -83,25 +83,12 @@ export default {
 				// get requested command
 				var commandName = interactionObject.data.name
 				if ("options" in interactionObject.data) commandName = `${interactionObject.data.name}_${interactionObject.data.options[0].name}`
-
-				console.log(`command name: ${commandName}!`)
-
-				console.log(`checking if command spec exists...`)
 				var commandRawName = Setup.getCommandClassByName(commandName)
-				if (commandRawName) { // if command spec not found
-					commandName = commandRawName
-					/*
-					console.warn(`command not found!`)
-					return Requests.createResponse({
-						"type": Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-						"data": {
-							"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
-							"content": "Sorry, I'm not sure how to process that command",
-							"tts": false
-						}
-					}, 200);
-*/
-				}
+				if (commandRawName) { commandName = commandRawName }
+				
+				console.log(`command name: ${commandName}!`)
+				console.log(`checking if command spec exists...`)
+
 				// get callback type because it may need to be instant
 				// TODO: OTHER CALLBACK TYPES
 				switch (Commands[commandName].spec.callback) {
@@ -136,28 +123,19 @@ export default {
 				console.log("interaction identified as message component interaction!")
 
 				// get requested command
-				var commandName = interactionObject.message.interaction.name
+				var commandName = interactionObject.message.interaction.name.replace(" ","_")
+
 				console.log(`command name: ${commandName}!`)
 				console.log(`checking if command spec exists...`)
 				var commandRawName = Setup.getCommandClassByName(commandName)
-				if (!commandRawName) { // if command spec not found
-					console.warn(`command not found!`)
-					return Requests.createResponse({
-						"type": Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
-						"data": {
-							"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
-							"content": "Sorry, I'm not sure how to process that command",
-							"tts": false
-						}
-					}, 404);
-
-				}
+				
+				if (commandRawName) commandName=commandRawName
 
 				// run command (in background)
 				console.log(`calling command...`)
 				ctx.waitUntil(
 					new Promise(async function (resolve) {
-						await Commands[commandRawName].update(interactionObject)
+						await Commands[commandName].update(interactionObject)
 						return resolve(undefined);
 					})
 				)
