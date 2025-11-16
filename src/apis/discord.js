@@ -37,7 +37,7 @@ export async function isValidRequest(body,headers) {
 
 export async function sendToEndpoint(method, endpoint, body) {
 	console.log("making request to discord...")
-	return await Requests.createHttpRequest(method,`${env.DISCORD_API_BASE_URL+endpoint}`,body,[["Authorization",env.DISCORD_BOT_TOKEN]])
+	return await Requests.createHttpRequest(method,`${env.DISCORD_API_BASE_URL+endpoint}`,body,[["Authorization",`Bot ${env.DISCORD_BOT_TOKEN}`]])
 }
 
 export function getUserAvatarURL(userData) {
@@ -442,6 +442,7 @@ export class ComponentBuilder {
 // --------------------
 
 export class ApplicationCommandTypes {
+	static CATEGORY = 0 // CUSTOM 
 	static CHAT_INPUT = 1
 	static USER = 2
 	static MESSAGE = 3
@@ -464,82 +465,83 @@ export class ApplicationCommandTypes {
 	}
 }
 
-// Get Global Application Commands
-export async function getGlobalApplicationCommands(applicationID, botToken = null) {
-	const url = `https://discord.com/api/applications/${applicationID}/commands`;
-	const options = {
-		method: 'GET',
-		headers: {
-			Authorization: `Bot ${botToken?botToken:process.env.DISCORD_BOT_TOKEN}`,
-			'content-type': 'application/json'
-		},
-	};
-
-	try {
-		const response = await fetch(url, options);
-		const data = await response.json();
-		return {
-			status: response.status,
-			data: data
-		}
-	} catch (error) {
-		console.error(error);
-	}
-}
-
 
 // Create Global Application Commands
 // applicationID - int - S.E.
 // commandDesc - JSON object - the JSON parameters of the command
-export async function createGlobalApplicationCommand(applicationID, commandDesc) {
-	console.log(`Registering ${ApplicationCommandTypes.name(commandDesc.type)} command '${commandDesc.name}'...`)
+export async function createGlobalApplicationCommand(commandData) {
+	console.log(`Registering ${ApplicationCommandTypes.name(commandData.type)} global command '${commandData.name}'...`)
 
 	// Send request to create
 	try {
-
-		const url = `https://discord.com/api/applications/${applicationID}/commands`;
-		const options = {
-			method: 'POST',
-			headers: {
-				Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
-				'content-type': 'application/json'
-			},
-			body: JSON.stringify(commandDesc)
-		};
-
+		const endpoint = `/applications/${env.DISCORD_BOT_ID}/commands`;
 		// Process response
-		const response = await fetch(url, options);
-		const data = await response.json();
-		if (response.status == 200) console.log(`${ApplicationCommandTypes.name(data.type)} Command "${data.name}" has been successfully overwritten! (ID: ${data.id})`)
-		else if (response.status == 201) console.log(`${ApplicationCommandTypes.name(data.type)} Command "${data.name}" has been successfully created! (ID: ${data.id})`)
-		else console.log(data)
+		const response = await sendToEndpoint("POST",endpoint,commandData)
+		//const data = await response.json();
+		//if (response.status == 200) console.log(`${ApplicationCommandTypes.name(data.type)} Command "${data.name}" has been successfully overwritten! (ID: ${data.id})`)
+		//else if (response.status == 201) console.log(`${ApplicationCommandTypes.name(data.type)} Command "${data.name}" has been successfully created! (ID: ${data.id})`)
+		//else console.log(data)
+
+	return response
 
 	} catch (error) {
 		console.error(error);
 	}
 }
 
-// Delete Global Application Commands
-// Note: you better know what you are deleting cause I'm not adding any identifying functions past id
-export async function deleteGlobalApplicationCommand(applicationID, commandID) {
-	console.log(`Deleting command ${commandID}...`)
-	const url = `https://discord.com/api/applications/${applicationID}/commands/${commandID}`;
-	const options = {
-		method: 'DELETE',
-		headers: {
-			Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN}`,
-			'content-type': 'application/json'
-		},
-		body: ''
-	};
+// Create Guild Application Commands
+// applicationID - int - S.E.
+// commandDesc - JSON object - the JSON parameters of the command
+export async function createGuildApplicationCommand(commandData,guildID) {
+	console.log(`Registering ${ApplicationCommandTypes.name(commandData.type)} command '${commandData.name} with guild ${guildID}'...`)
 
+	// Send request to create
 	try {
-		const response = await fetch(url, options);
-		if (response.status == 204) console.log("Deletion successful!")
-		else {
-			console.log("ERROR: Deletion unsuccessful!")
-		}
-		return (response.status);
+		const endpoint = `/applications/${env.DISCORD_BOT_ID}/guilds/${guildID}/commands`;
+		// Process response
+		const response = await sendToEndpoint("POST",endpoint,commandData)
+		//const data = await response.json();
+		//if (response.status == 200) console.log(`${ApplicationCommandTypes.name(data.type)} Command "${data.name}" has been successfully overwritten! (ID: ${data.id})`)
+		//else if (response.status == 201) console.log(`${ApplicationCommandTypes.name(data.type)} Command "${data.name}" has been successfully created! (ID: ${data.id})`)
+		//else console.log(data)
+
+		return response
+
+	} catch (error) {
+		console.error(error);
+	}
+}
+
+// Delete ALL Guild Application Commands
+// Note: you better know what you are deleting cause I'm not adding any identifying functions past id
+export async function deleteAllGuildApplicationCommands(guildID) {
+	console.log(`Deleting ALL guild commands in ${guildID}...`)
+	
+	try {	
+		const endpoint = `/applications/${env.DISCORD_BOT_ID}/guilds/${guildID}/commands/`;
+
+		const response = await sendToEndpoint("PUT",endpoint,commandData) 
+
+		return response
+
+	} catch (error) {
+		return (error);
+	}
+}
+
+
+// Delete ALL Global Application Commands
+// Note: you better know what you are deleting cause I'm not adding any identifying functions past id
+export async function deleteAllGlobalApplicationCommands() {
+	console.log(`Deleting ALL global commands`)
+	
+	try {	
+		const endpoint = `/applications/${env.DISCORD_BOT_ID}/commands/`;
+
+		const response = await sendToEndpoint("PUT",endpoint,commandData) 
+
+		return response
+
 	} catch (error) {
 		return (error);
 	}

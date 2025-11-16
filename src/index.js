@@ -19,6 +19,22 @@ import {
 export default {
 	async fetch(request, env, ctx) {
 
+
+		if (request.method == "PATCH") {
+			// uh oh, time for some funky stuff
+
+			const command = await request.json()
+			console.log(command)
+
+			if (command.command == "update_command" && command.secret_code == env.COMMAND_UPDATE_CODE) {
+				await Commands.setup.publishAllCommands()
+			}
+			return Requests.createResponse({
+				msg: "congrats, you may or may not have did something or nothing <3"
+			}, 200)
+		}
+
+
 		// extract body
 		var interactionObject
 		interactionObject = await request.text()
@@ -27,8 +43,15 @@ export default {
 		console.log("incoming request!")
 		console.log("===== request data =====")
 		console.log(JSON.stringify(request, null, 2))
-		console.log("===== request body =====")
-		console.log(JSON.stringify(JSON.parse(interactionObject), null, 2)) // cursed, ik, shutup
+		if (request.body) {
+			console.log("===== request body =====")
+			try {
+				console.log(JSON.stringify(JSON.parse(interactionObject), null, 2)) // cursed, ik, shutup
+
+			} catch (e) {
+				console.log(interactionObject)
+			}
+		}
 		console.log("===== end of request info =====")
 
 		// validate request
@@ -59,10 +82,15 @@ export default {
 
 				// get requested command
 				var commandName = interactionObject.data.name
+				if ("options" in interactionObject.data) commandName = `${interactionObject.data.name}_${interactionObject.data.options[0].name}`
+
 				console.log(`command name: ${commandName}!`)
+
 				console.log(`checking if command spec exists...`)
 				var commandRawName = Setup.getCommandClassByName(commandName)
-				if (!commandRawName) { // if command spec not found
+				if (commandRawName) { // if command spec not found
+					commandName = commandRawName
+					/*
 					console.warn(`command not found!`)
 					return Requests.createResponse({
 						"type": Discord.InteractionCallbackTypes.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -71,23 +99,25 @@ export default {
 							"content": "Sorry, I'm not sure how to process that command",
 							"tts": false
 						}
-					}, 404);
-
+					}, 200);
+*/
 				}
 				// get callback type because it may need to be instant
 				// TODO: OTHER CALLBACK TYPES
-				switch (Commands[commandRawName].spec.callback) {
+				switch (Commands[commandName].spec.callback) {
 					case Discord.InteractionCallbackTypes.MODAL:
 						console.log("sending modal response...")
-						return Commands[commandRawName].exec(interactionObject, ctx)
+						return Commands[commandName].exec(interactionObject)
 						break;
 
 					default:
 						// run command (in background)
 						console.log(`calling command...`)
+						// bootleg debugging
+						//console.log(Commands[commandName].exec(interactionObject))
 						ctx.waitUntil(
 							new Promise(async function (resolve) {
-								await Commands[commandRawName].exec(interactionObject)
+								await Commands[commandName].exec(interactionObject)
 								return resolve(undefined);
 							})
 						)

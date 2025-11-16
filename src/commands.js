@@ -1,6 +1,7 @@
 import * as Discord from "./apis/discord.js";
 import * as Space from "./apis/snapps-space.js"
 import * as Requests from "./utils/requests.js"
+import * as Commands from "./commands.js"
 import {
 	env
 } from "cloudflare:workers";
@@ -13,28 +14,254 @@ import {
 - profile command
 - account settings commands
 - asks commands
+- subcommands
+- command perms
+- command prod statsus
 - commissions
 */
 
+/* command template 
+
+export class [command name]{
+	static spec = {
+		name:, // as it appears to discord
+		type:, // command type
+		callback:, // wether to defer or not, really
+		description:, // as it appears to discord
+		contexts: [], // where can the command be used
+		isInDev:, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: // what roll has access to the command
+	}
+
+	 // this will be called upon initial command use (sans modals and autocompete (probably))
+	static async exec(interactionData){}
+
+	// when message component is interacted with, this is the fuction that runs
+	static async update(interactionData){}
+}
+
+*/
+
+/* defered reply template
+
+try {
+	// log command or something
+
+	// do command stuff
+	var message = {} // the message to send back
+	message.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]) // make the message ephemeral
+	
+	// return message to discord
+	await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, message)
+
+} catch (e) {
+	// log error
+	console.error(e)
+
+	// return error message to discord
+	await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, {
+		flags: Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+		content: "",
+		tts: false,
+		embeds: [{
+			id: 1,
+			description: "Something went wrong running the command...",
+			"color": 0xff0000
+		}],
+	})
+}
+
+*/
+
+// this is how the commands are to be laid out
+// this is also a todo list now,
+export class setup {
+	static layout = {
+		slash: [
+			"help",
+			"pet",
+			"category_account",
+			/* placeholder
+			{
+				category: "request",
+				commands: [{
+						command: request_help
+					},
+					{
+						command: request_new
+					},
+					{
+						command: request_edit
+					},
+					{
+						command: request_list
+					},
+					{
+						command: request_view
+					},
+					{
+						command: request_delete
+					},
+				]
+			},
+			{
+				category: "ask",
+				commands: [{
+						command: ask_help
+					},
+					{
+						command: ask_new
+					},
+					{
+						command: ask_edit
+					},
+					{
+						command: ask_list
+					},
+					{
+						command: ask_view
+					},
+					{
+						command: ask_delete
+					},
+				]
+			},
+			*/
+		],
+		user: [
+			"user_profile"
+		]
+	}
+
+	// not the most robust (non-recusive, missing subcommand groups, repeated code), but should be good enough for my means
+	// TODO: options/parameters
+	static async publishAllCommands() {
+		console.log("refreshing published commands...")
+
+		console.log("wiping all commands...")
+		await Discord.deleteAllGuildApplicationCommands(env.DISCORD_TEST_SERVER_ID)
+		await Discord.deleteAllGlobalApplicationCommands()
+
+		var command;
+
+
+
+		for (let index = 0; index < setup.layout.user.length; index++) {
+			const element = Commands[setup.layout.user[index]];
+			console.log(element)
+
+			// command object
+			command = {
+				type: element.spec.type,
+				name: element.spec.name,
+				description: element.spec.description,
+				nsfw: false,
+				contexts: element.spec.contexts,
+			}
+			console.log(command)
+
+			if (element.spec.isInDev) { // if in dev
+				// create guild command
+				await Discord.createGuildApplicationCommand(command, env.DISCORD_TEST_SERVER_ID)
+
+			} else { // otherwise...
+				// create global command
+				await Discord.createGlobalApplicationCommand(command)
+
+			}
+		}
+
+		// slash commands
+		for (let index = 0; index < setup.layout.slash.length; index++) {
+			const element = Commands[setup.layout.slash[index]];
+			console.log(element)
+
+			// command object
+			command = {
+				type: element.spec.type,
+				name: element.spec.name,
+				description: element.spec.description,
+				nsfw: false,
+				contexts: element.spec.contexts,
+			}
+
+			if (element.spec.type == Discord.ApplicationCommandTypes.CATEGORY) {
+				command.options = []
+				command.type = 1
+				//delete command.type
+				for (let index = 0; index < element.commands.length; index++) {
+					var subcommand = Commands[element.commands[index]]
+					var subcom = {}
+					subcom.type = 1
+					subcom.name = subcommand.spec.name
+					subcom.description = subcommand.spec.description
+					subcom.nsfw = false
+					subcom.contexts = subcommand.spec.contexts
+					command.options.push(subcom)
+				}
+			}
+
+			console.log(command)
+
+			if (element.spec.isInDev) { // if in dev
+				// create guild command
+				await Discord.createGuildApplicationCommand(command, env.DISCORD_TEST_SERVER_ID)
+
+			} else { // otherwise...
+				// create global command
+				await Discord.createGlobalApplicationCommand(command)
+
+			}
+
+		}
+
+		// user commands
+	}
+
+}
+
+
 // command specifications go here
 
-// registration command
-export class register {
+// --- pet command ---
 
-	static registerURL = "https://discord.com/oauth2/authorize?client_id=1415423498641211542&response_type=code&redirect_uri=https%3A%2F%2Fshibboleth.snapps.dev%2Fregister%2Fdiscord%2F&scope=identify+guilds.members.read"
+// ----- account category  -----
+
+export class category_account {
+	static spec = {
+		name: "account",
+		type: Discord.ApplicationCommandTypes.CATEGORY, // command type
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, // wether to defer or not, really
+		description: "View or change your account settings.", // as it appears to discord
+		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM], // where can the command be used
+		isInDev: true, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: null, // what roll has access to the command (global if null)
+	}
+	static commands = [
+		"account_register",
+		"account_privacy",
+		"account_wild",
+		"account_delete",
+	]
+}
+
+// --- account registration ---
+export class account_register {
 
 	static spec = {
 		name: "register",
-		callback: Discord.InteractionCallbackTypes.MODAL,
-		type: Discord.ApplicationCommandTypes.CHAT_INPUT,
-		description: "Sends you a link to sign up to Snapps Space.",
-		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM]
+		type: Discord.ApplicationCommandTypes.CHAT_INPUT, // command type
+		callback: Discord.InteractionCallbackTypes.MODAL, // wether to defer or not, really
+		description: "Gets you signed up to Snapps Space!", // as it appears to discord
+		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM], // where can the command be used
+		isInDev: false, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: null, // what roll has access to the command (global if null)
 	}
 	static exec(interactionContent) {
 		console.log("sending registration modal...")
 
 		return Requests.createResponse({
-			"type": register.spec.callback,
+			"type": account_register.spec.callback,
 			"data": {
 				"custom_id": "register_modal",
 				"title": "Snapps' Space Registration",
@@ -83,6 +310,167 @@ With this account, you'll be access to many things:
 	}
 }
 
+// --- account privacy ---
+export class account_privacy {
+	static spec = {
+		name: "privacy", // as it appears to discord
+		type: Discord.ApplicationCommandTypes.CHAT_INPUT, // command type
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, // wether to defer or not, really
+		description: "Manage you account privacy.", // as it appears to discord
+		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM], // where can the command be used
+		isInDev: true, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: null // what roll has access to the command
+	}
+
+	// this will be called upon initial command use (sans modals and autocompete (probably))
+	static async exec(interactionData) {
+		try {
+			// log command or something
+
+			// do command stuff
+			var message = {} // the message to send back
+			message.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]) // make the message ephemeral
+
+			// return message to discord
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, message)
+
+		} catch (e) {
+			// log error
+			console.error(e)
+
+			// return error message to discord
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, {
+				flags: Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+				content: "",
+				tts: false,
+				embeds: [{
+					id: 1,
+					description: "Something went wrong running the command...",
+					"color": 0xff0000
+				}],
+			})
+		}
+	}
+
+	// when message component is interacted with, this is the fuction that runs
+	static async update(interactionData) {}
+}
+
+// --- account wild ---
+export class account_wild {
+	static spec = {
+		name: "wild", // as it appears to discord
+		type: Discord.ApplicationCommandTypes.CHAT_INPUT, // command type
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, // wether to defer or not, really
+		description: "For those with more 'wild' tastes.", // as it appears to discord
+		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM], // where can the command be used
+		isInDev: true, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: null // what roll has access to the command
+	}
+
+	// this will be called upon initial command use (sans modals and autocompete (probably))
+	static async exec(interactionData) {
+
+		try {
+			// log command or something
+
+			// do command stuff
+			var message = {} // the message to send back
+			message.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]) // make the message ephemeral
+
+			// return message to discord
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, message)
+
+		} catch (e) {
+			// log error
+			console.error(e)
+
+			// return error message to discord
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, {
+				flags: Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+				content: "",
+				tts: false,
+				embeds: [{
+					id: 1,
+					description: "Something went wrong running the command...",
+
+					"color": 0xff0000
+				}],
+			})
+		}
+	}
+
+	// when message component is interacted with, this is the fuction that runs
+	static async update(interactionData) {}
+}
+
+// --- account delete ---
+export class account_delete {
+	static spec = {
+		name: "delete", // as it appears to discord
+		type: Discord.ApplicationCommandTypes.CHAT_INPUT, // command type
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, // wether to defer or not, really
+		description: "Delete your Snapps Space account", // as it appears to discord
+		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM], // where can the command be used
+		isInDev: true, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: null // what roll has access to the command
+	}
+
+	// this will be called upon initial command use (sans modals and autocompete (probably))
+	static async exec(interactionData) {
+		try {
+			// log command or something
+
+			// do command stuff
+			var message = {} // the message to send back
+			message.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]) // make the message ephemeral
+
+			// return message to discord
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, message)
+
+		} catch (e) {
+			// log error
+			console.error(e)
+
+			// return error message to discord
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, {
+				flags: Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+				content: "",
+				tts: false,
+				embeds: [{
+					id: 1,
+					description: "Something went wrong running the command...",
+					"color": 0xff0000
+				}],
+			})
+		}
+	}
+
+	// when message component is interacted with, this is the fuction that runs
+	static async update(interactionData) {}
+}
+
+// ----- loose commands -----
+
+// general help
+export class help {
+	static spec = {
+		name: "help", // as it appears to discord
+		type: Discord.ApplicationCommandTypes.CHAT_INPUT, // command type
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, // wether to defer or not, really
+		description: "What is this creature? What do they do?", // as it appears to discord
+		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM], // where can the command be used
+		isInDev: true, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: null // what roll has access to the command
+	}
+
+	// this will be called upon initial command use (sans modals and autocompete (probably))
+	static async exec(interactionData) {}
+
+	// when message component is interacted with, this is the fuction that runs
+	static async update(interactionData) {}
+}
+
 // pet command
 export class pet {
 
@@ -111,13 +499,16 @@ export class pet {
 
 
 	static spec = {
-		"name": "pet",
-		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-		"type": Discord.ApplicationCommandTypes.CHAT_INPUT,
-		"description": "Pet the service kobold.",
+		name: "pet", // as it appears to discord
+		type: Discord.ApplicationCommandTypes.CHAT_INPUT, // command type
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, // wether to defer or not, really
+		description: "Pet the service kobold.", // as it appears to discord
+		contexts: [Discord.InteractionContextTypes.GUILD, Discord.InteractionContextTypes.BOT_DM], // where can the command be used
+		isInDev: true, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: null // what roll has access to the command
 	}
 
-	static async exec(interactionContent) {
+	static async exec(interactionData) {
 		try {
 			var petData;
 			const petChance = Math.random()
@@ -128,7 +519,7 @@ export class pet {
 				petData = pet.chooseRandom(pet.NORMAL_PET_LIST)
 			}
 
-			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, {
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, {
 				"flags": Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
 				"content": "",
 				"tts": false,
@@ -142,78 +533,95 @@ export class pet {
 					"color": petData[1]
 				}],
 			})
-
 		} catch (e) {
+			// log error
 			console.error(e)
+
+			// return error message to discord
+			await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, {
+				flags: Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL]),
+				content: "",
+				tts: false,
+				embeds: [{
+					id: 1,
+					description: "Something went wrong running the command...",
+					"color": 0xff0000
+				}],
+			})
 		}
+
 	}
 
 }
 
+// ----- user context commands -----
 
-// YOU ARE WORKING ON THIS
-// GODSPEED
-export class profile_user {
+// user profile lookup
+export class user_profile {
 	static spec = {
-		"name": "Snapps' Space Profile",
-		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-		"type": Discord.ApplicationCommandTypes.USER,
+		name: "Snapps' Space Profile", // as it appears to discord
+		type: Discord.ApplicationCommandTypes.USER, // command type
+		callback: Discord.InteractionCallbackTypes.DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE, // wether to defer or not, really
+		//description: "Pet the service kobold.", // as it appears to discord
+		contexts: [Discord.InteractionContextTypes.GUILD], // where can the command be used
+		isInDev: true, // T/F - whether or not to deploy the command to all servers or just dev server
+		perms: null // what roll has access to the command
 	}
 
-	static async exec(interactionContent) {
+	static async exec(interactionData) {
 
-		await profile_user.followup(interactionContent)
+		await user_profile.followup(interactionData)
 
 	}
 
 
-	static async followup(interactionContent) {
+	static async followup(interactionData) {
 
-		var isSelf = interactionContent.member.user.id == interactionContent.data.target_id
+		var isSelf = interactionData.member.user.id == interactionData.data.target_id
 		var body;
 
 		console.log("Following up on profile query...")
 
 		// get user
 		var userData;
-		var userDataRequest = await Space.getUser(interactionContent.data.target_id);
+		var userDataRequest = await Space.getUser(interactionData.data.target_id);
 		var userData = userDataRequest.data
 
 
 		// if profile private and !isSelf return private profile notice
 		if (!userData || (await env.snapps_dev.isPrivate(userData) && !isSelf)) {
-			body = profile_user.generateNotFoundPage()
+			body = user_profile.generateNotFoundPage()
 		} else {
-			body = profile_user.generateFrontPage(userData)
+			body = user_profile.generateFrontPage(userData)
 		}
 		body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 
-		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, body)
+		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, body)
 
 	}
 
-	static async update(interactionContent) {
+	static async update(interactionData) {
 
 		var body
 
 		// get user
 		var userData;
-		var userDataRequest = await Space.getUser(interactionContent.message.interaction_metadata.target_user.id);
+		var userDataRequest = await Space.getUser(interactionData.message.interaction_metadata.target_user.id);
 		userData = userDataRequest.data
 
-		switch (interactionContent.data.values[0]) {
+		switch (interactionData.data.values[0]) {
 			case "id": //Front Page
-				body = profile_user.generateFrontPage(userData)
+				body = user_profile.generateFrontPage(userData)
 				body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 				break;
 			case "ask": //Ask Page
-				body = profile_user.generateAskPage(userData)
+				body = user_profile.generateAskPage(userData)
 				body.flags = Discord.MessageFlags.toBitfield([Discord.MessageFlags.EPHEMERAL, Discord.MessageFlags.IS_COMPONENTS_V2])
 				break;
 		}
 
 		// Send Callback
-		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionContent.token}/messages/@original`, body)
+		await Discord.sendToEndpoint("PATCH", `/webhooks/${env.DISCORD_BOT_ID}/${interactionData.token}/messages/@original`, body)
 	}
 
 	static generatePageMenuComponent() {
@@ -270,7 +678,7 @@ Registered Since: ${new Date(userData.created_at).toLocaleDateString()}
 
 		body.components.push(basicsContainer.build())
 
-		const menubar = profile_user.generatePageMenuComponent()
+		const menubar = user_profile.generatePageMenuComponent()
 		body.components.push(menubar)
 		return body
 
@@ -305,7 +713,7 @@ Woah, hey, hold up! This is a work in progress!`)
 
 		body.components.push(basicsContainer.build())
 
-		const menubar = profile_user.generatePageMenuComponent()
+		const menubar = user_profile.generatePageMenuComponent()
 		body.components.push(menubar)
 
 		return body
